@@ -2,6 +2,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+from PIL import Image
+
+if not hasattr(Image, "ANTIALIAS") and hasattr(Image, "Resampling"):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
+
 from utils.lpr import LPRModel
 from utils.image_utils import preprocess_image
 

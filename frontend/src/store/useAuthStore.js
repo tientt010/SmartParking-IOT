@@ -55,7 +55,11 @@ export const useAuthStore = create(
       signup: async (userData) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await AxiosInstance.post("/auth/signup", userData);
+          const response = await AxiosInstance.post("/auth/signup", {
+            username: userData.username,
+            password: userData.password,
+            role: "admin",
+          });
           const { token, user } = response.data;
 
           localStorage.setItem("token", token);

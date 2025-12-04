@@ -1,6 +1,7 @@
 import Log from "../models/Log.js";
 import ParkingSlot from "../models/ParkingSlot.js";
 import Whitelist from "../models/Whitelist.js";
+import Sensor from "../models/Sensor.js";
 import axios from "axios";
 import FormData from "form-data";
 
@@ -41,7 +42,12 @@ const callAIService = async (image) => {
     console.error("AI Service returned no plate number:", response.data);
     return null;
   } catch (error) {
-    console.error("AI Service error:", error.message);
+    console.error(
+      "AI Service error:",
+      error.message,
+      error.response?.status,
+      error.response?.data
+    );
     return null;
   }
 };
@@ -49,9 +55,13 @@ const callAIService = async (image) => {
 export const lprController = async (req, res) => {
   try {
     const image = req.file ? req.file.buffer : req.body.image;
+    console.log(
+      "[LPR] Request received. Image type:",
+      req.file ? "buffer" : "base64"
+    );
 
     const plateNumber = await callAIService(image);
-    console.log(plateNumber);
+    console.log("[LPR] Detected plate number:", plateNumber);
 
     if (!plateNumber) {
       return res.json({
@@ -60,12 +70,14 @@ export const lprController = async (req, res) => {
       });
     }
 
+    console.log("[LPR] Checking whitelist for plate:", plateNumber);
     const whiteListEntry = await Whitelist.findOne({
       vehiclePlate: plateNumber,
       status: "active",
     });
 
     if (!whiteListEntry) {
+      console.log("[LPR] Plate NOT in whitelist - DENY");
       await Log.create({
         vehiclePlate: plateNumber,
         action: "entry",
@@ -82,39 +94,11 @@ export const lprController = async (req, res) => {
       return res.json({ action: "deny", reason: "Not in whitelist" });
     }
 
-    const emptySlot = await ParkingSlot.findOne({ status: "empty" });
-
-    if (!emptySlot) {
-      await Log.create({
-        vehiclePlate: plateNumber,
-        action: "entry",
-        status: "denied",
-        imagePath: image,
-      });
-
-      req.app.get("io")?.emit("lpr:result", {
-        number: plateNumber,
-        action: "deny",
-        reason: "No available slots",
-      });
-
-      return res.json({ action: "deny", reason: "No available slots" });
-    }
-
-    emptySlot.status = "occupied";
-    emptySlot.vehiclePlate = plateNumber;
-    emptySlot.entryTime = new Date();
-    await emptySlot.save();
-
-    req.app.get("io")?.emit("slot:update", {
-      slotNumber: emptySlot.slotNumber,
-      status: "occupied",
-      vehiclePlate: plateNumber,
-    });
+    // === TẠM THỜI BỎ TOÀN BỘ LOGIC CHIẾM CHỖ / SLOT ĐỂ TEST MỞ CỬA ===
+    // Giữ lại duy nhất: ghi log entry + emit kết quả accept, KHÔNG động vào ParkingSlot
 
     await Log.create({
       vehiclePlate: plateNumber,
-      slot: emptySlot._id,
       action: "entry",
       entryTime: new Date(),
       imagePath: image,
@@ -124,18 +108,28 @@ export const lprController = async (req, res) => {
     req.app.get("io")?.emit("lpr:result", {
       number: plateNumber,
       action: "accept",
-      slotNumber: emptySlot.slotNumber,
     });
 
     req.app.get("io")?.emit("device:control", { action: "Open" }); // Gui len thiet bi de mo cổng
 
+    // Gửi lệnh mở barrier qua MQTT (không phụ thuộc slot)
     const mqttClient = req.app.get("mqttClient");
-    mqttClient?.publish(
-      "iot/parking/barrier",
-      JSON.stringify({ action: "Open", source: "lpr" })
-    );
+    if (mqttClient) {
+      mqttClient.publish(
+        "esp32/parking/gate/control",
+        "open", // ESP32 sẽ tự đóng khi xe qua sensor 2
+        { qos: 1 }
+      );
+      console.log(
+        "[LPR] ✅ Sent MQTT command to open barrier (esp32/parking/gate/control = 'open')"
+      );
+    } else {
+      console.error(
+        "[LPR] ❌ MQTT client not available - cannot send open command"
+      );
+    }
 
-    res.json({ action: "accept", slotNumber: emptySlot.slotNumber });
+    res.json({ action: "accept" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
