@@ -6,7 +6,6 @@ export const useStatsStore = create((set) => ({
   isLoading: false,
   error: null,
 
-  // Lấy thống kê theo ngày/tuần/tháng
   fetchStats: async (type = "day") => {
     set({ isLoading: true, error: null });
     try {
@@ -14,8 +13,8 @@ export const useStatsStore = create((set) => ({
       set({ stats: response.data, isLoading: false });
       return response.data;
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Lấy thống kê thất bại";
-      set({ error: errorMessage, isLoading: false });
+      const errorMessage = error.response?.data?.message || "Fetch stats failed";
+      set({ error: errorMessage, isLoading: false, stats: null });
       return null;
     }
   },

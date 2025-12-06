@@ -6,7 +6,6 @@ export const useLogStore = create((set) => ({
   isLoading: false,
   error: null,
 
-  // Lấy danh sách logs với filter
   fetchLogs: async (params = {}) => {
     set({ isLoading: true, error: null });
     try {
@@ -23,7 +22,7 @@ export const useLogStore = create((set) => ({
       set({ logs: response.data, isLoading: false });
       return response.data;
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Lấy logs thất bại";
+      const errorMessage = error.response?.data?.message || "Fetch logs failed";
       set({ error: errorMessage, isLoading: false });
       return null;
     }

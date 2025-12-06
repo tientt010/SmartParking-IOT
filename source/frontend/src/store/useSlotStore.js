@@ -6,7 +6,6 @@ export const useSlotStore = create((set, get) => ({
   isLoading: false,
   error: null,
 
-  // Lấy danh sách tất cả slot
   fetchSlots: async () => {
     set({ isLoading: true, error: null });
     try {
@@ -14,13 +13,12 @@ export const useSlotStore = create((set, get) => ({
       set({ slots: response.data, isLoading: false });
       return response.data;
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Lấy danh sách slot thất bại";
+      const errorMessage = error.response?.data?.message || "Fetch slots failed";
       set({ error: errorMessage, isLoading: false });
       return null;
     }
   },
 
-  // Đếm số slot theo trạng thái
   getSlotCounts: () => {
     const { slots } = get();
     const empty = slots.filter((s) => s.status === "empty").length;

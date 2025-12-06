@@ -1,39 +1,31 @@
-import { useEffect, useState } from "react";
-import { AxiosInstance } from "@/lib/axios";
+import { useEffect } from "react";
 import { Car, Database, ParkingSquare, AlertTriangle } from "lucide-react";
 import StatsCard from "@/components/dashboard/StatsCard";
 import AlertList from "@/components/dashboard/AlertList";
 import ActivityList from "@/components/dashboard/ActivityList";
-import BarrierStatus from "@/components/dashboard/BarrierStatus";
+import { useStatsStore } from "@/store/useStatsStore";
+import { useLogStore } from "@/store/useLogStore";
+import { useSlotStore } from "@/store/useSlotStore";
 
 const DashboardPage = () => {
-  const [stats, setStats] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { stats, isLoading: statsLoading, error, fetchStats } = useStatsStore();
+  const { logs, isLoading: logsLoading, fetchLogs } = useLogStore();
+  const { fetchSlots, getSlotCounts } = useSlotStore();
 
+  const { empty, occupied, total } = getSlotCounts();
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsRes, logsRes] = await Promise.all([
-          AxiosInstance.get("/stats"),
-          AxiosInstance.get("/logs?limit=5"),
-        ]);
-        setStats(statsRes.data);
-        setLogs(logsRes.data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+    fetchStats("day");
+    fetchLogs({ limit: 5 });
+    fetchSlots();
+  }, [fetchStats, fetchLogs, fetchSlots]);
 
-  if (loading) {
+  if (statsLoading) {
     return (
       <div className="flex items-center justify-center h-full">Loading...</div>
     );
   }
+
+  if (error) return <div className="text-red-500 text-sm">{error}</div>;
 
   return (
     <div>
@@ -53,14 +45,14 @@ const DashboardPage = () => {
         <StatsCard
           icon={Database}
           label="Dung lượng"
-          value={stats?.occupiedSlots || 0}
-          sublabel={`/${stats?.totalSlots || 0} slot`}
+          value={occupied || 0}
+          sublabel={`/${total || 0} slot`}
           color="green"
         />
         <StatsCard
           icon={ParkingSquare}
           label="Còn trống"
-          value={stats?.emptySlots || 0}
+          value={empty || 0}
           sublabel="Slot trống"
           color="purple"
         />
@@ -75,10 +67,8 @@ const DashboardPage = () => {
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         <AlertList />
-        <ActivityList logs={logs} />
+        <ActivityList logs={logs} isLoading={logsLoading} />
       </div>
-
-      <BarrierStatus />
     </div>
   );
 };

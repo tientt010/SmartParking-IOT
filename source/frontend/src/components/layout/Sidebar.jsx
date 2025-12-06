@@ -45,15 +45,25 @@ const Sidebar = () => {
               <NavLink
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
+                  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
                     isActive
                       ? "bg-blue-600 text-white"
                       : "text-gray-600 hover:bg-gray-100"
                   }`
                 }
               >
-                <item.icon className="w-5 h-5" />
-                {item.label}
+                {({ isActive }) => (
+                  <>
+                    <item.icon
+                      className={`w-5 h-5 ${
+                        isActive ? "text-white" : "text-blue-600"
+                      }`}
+                    />
+                    <span className={isActive ? "text-white" : "text-gray-700"}>
+                      {item.label}
+                    </span>
+                  </>
+                )}
               </NavLink>
             </li>
           ))}
@@ -71,7 +81,7 @@ const Sidebar = () => {
             </p>
             <p className="text-xs text-gray-500">{user?.role || "admin"}</p>
           </div>
-          <button onClick={logout} className="text-gray-400 hover:text-red-500">
+          <button onClick={logout} className="text-gray-400 hover:text-red-500 cursor-pointer">
             <LogOut className="w-5 h-5" />
           </button>
         </div>
