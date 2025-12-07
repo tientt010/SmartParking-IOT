@@ -6,7 +6,7 @@ const sensorSchema = new mongoose.Schema(
     slotNumber: { type: String, required: true },
     status: { type: Number, default: 0 },
     distance: Number,
-    threshold: {type: Number, default: 50},
+    threshold: {type: Number, default: 7},
   },
   { timestamps: true }
 );

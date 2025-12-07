@@ -6,7 +6,7 @@ export const useSensorStore = create((set) => ({
     isLoading: false,
     error: null,
 
-    fetchSensorsConfig: async () => {
+    fetchSensors: async () => {
         set({ isLoading: true, error: null });
         try {
           const res = await AxiosInstance.get("/hardware/sensors");
@@ -20,9 +20,8 @@ export const useSensorStore = create((set) => ({
       },
       
       updateSensorThreshold: async (sensorId, threshold) => {
-        set({ isLoading: true, error: null });
         try {
-          const res = await AxiosInstance.put(`/hardware/sensor/${sensorId}/config`, {
+          const res = await AxiosInstance.put(`/hardware/sensor/${sensorId}`, {
             threshold,
           });
           
@@ -30,14 +29,21 @@ export const useSensorStore = create((set) => ({
             sensors: state.sensors.map((s) =>
               s.sensorId === sensorId ? { ...s, threshold: res.data.threshold } : s
             ),
-            isLoading: false,
           }));
           return res.data;
         } catch (err) {
           const msg = err.response?.data?.error || "Failed to update threshold";
-          set({ error: msg, isLoading: false });
-          return null;
+          throw new Error(msg);
         }
+      },
+
+      // Update local state (chưa save)
+      setLocalThreshold: (sensorId, threshold) => {
+        set((state) => ({
+          sensors: state.sensors.map((s) =>
+            s.sensorId === sensorId ? { ...s, threshold } : s
+          ),
+        }));
       },
 
       clearError: () => set({ error: null }),

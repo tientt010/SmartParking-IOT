@@ -26,5 +26,22 @@ export const useSlotStore = create((set, get) => ({
     return { empty, occupied, total: slots.length };
   },
 
+  // Cập nhật slot từ socket event
+  updateSlot: (slotNumber, status, vehiclePlate = null, entryTime = null, exitTime = null) => {
+    set((state) => ({
+      slots: state.slots.map((slot) =>
+        slot.slotNumber === slotNumber
+          ? {
+              ...slot,
+              status,
+              vehiclePlate: vehiclePlate !== undefined ? vehiclePlate : slot.vehiclePlate,
+              entryTime: entryTime !== undefined ? entryTime : slot.entryTime,
+              exitTime: exitTime !== undefined ? exitTime : slot.exitTime,
+            }
+          : slot
+      ),
+    }));
+  },
+
   clearError: () => set({ error: null }),
 }));

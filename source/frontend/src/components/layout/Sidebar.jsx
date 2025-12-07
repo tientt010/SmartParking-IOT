@@ -16,10 +16,8 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: ParkingSquare, label: "Quản lý slot", path: "/slots" },
   { icon: FileText, label: "Logs", path: "/logs" },
-  { icon: Bell, label: "Cảnh báo ra/vào", path: "/alerts" },
   { icon: ListChecks, label: "Whitelist", path: "/whitelist" },
   { icon: Settings, label: "Cài đặt hệ thống", path: "/settings" },
-  { icon: Users, label: "Người dùng", path: "/users" },
 ];
 
 const Sidebar = () => {
@@ -27,7 +25,6 @@ const Sidebar = () => {
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-      {/* Logo */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -37,7 +34,6 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Menu */}
       <nav className="flex-1 p-4">
         <ul className="space-y-1">
           {menuItems.map((item) => (

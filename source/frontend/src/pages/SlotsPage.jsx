@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react";
 import { useSlotStore } from "@/store/useSlotStore";
+import { useSocket } from "@/hooks/useSocket";
 import { RefreshCw, Filter, Loader2, Car, ParkingSquare } from "lucide-react";
 
 const SlotsPage = () => {
-  const { slots, isLoading, error, fetchSlots, getSlotCounts } = useSlotStore();
+  const { slots, isLoading, error, fetchSlots, getSlotCounts, updateSlot } = useSlotStore();
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     fetchSlots();
   }, [fetchSlots]);
+
+  useSocket({
+    onSlotUpdate: (data) => {
+      updateSlot(data.slotNumber, data.status);
+    },
+    autoRefresh: fetchSlots,
+  });
 
   const handleRefresh = () => {
     fetchSlots();

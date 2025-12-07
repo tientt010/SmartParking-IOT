@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { Car, Database, ParkingSquare, AlertTriangle } from "lucide-react";
 import StatsCard from "@/components/dashboard/StatsCard";
 import AlertList from "@/components/dashboard/AlertList";
@@ -6,18 +6,34 @@ import ActivityList from "@/components/dashboard/ActivityList";
 import { useStatsStore } from "@/store/useStatsStore";
 import { useLogStore } from "@/store/useLogStore";
 import { useSlotStore } from "@/store/useSlotStore";
+import { useSocket } from "../hooks/useSocket";
+import DeviceControlCard from "../components/dashboard/DeviceControlCard";
 
 const DashboardPage = () => {
   const { stats, isLoading: statsLoading, error, fetchStats } = useStatsStore();
   const { logs, isLoading: logsLoading, fetchLogs } = useLogStore();
-  const { fetchSlots, getSlotCounts } = useSlotStore();
+  const { fetchSlots, getSlotCounts, updateSlot } = useSlotStore();
+
+  const refreshData = useCallback(() => {
+    fetchStats("day");
+    fetchLogs({limit: 4});
+    fetchSlots();
+  }, [fetchStats, fetchLogs, fetchSlots]);
+
+  useSocket({
+    autoRefresh: refreshData,
+    onLprResult: (data) => {
+      console.log("Dashboard received LPR:", data);
+    },
+    onSlotUpdate: (data) => {
+      updateSlot(data.slotNumber, data.status);
+    },
+  });
 
   const { empty, occupied, total } = getSlotCounts();
   useEffect(() => {
-    fetchStats("day");
-    fetchLogs({ limit: 5 });
-    fetchSlots();
-  }, [fetchStats, fetchLogs, fetchSlots]);
+    refreshData();
+  }, [refreshData]);
 
   if (statsLoading) {
     return (
@@ -61,11 +77,12 @@ const DashboardPage = () => {
           label="Cảnh báo"
           value={3}
           sublabel="Chưa xử lý"
-          color="red"
+          color="red" 
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <DeviceControlCard />
         <AlertList />
         <ActivityList logs={logs} isLoading={logsLoading} />
       </div>

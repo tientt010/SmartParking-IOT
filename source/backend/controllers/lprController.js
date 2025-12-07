@@ -1,7 +1,5 @@
 import Log from "../models/Log.js";
-import ParkingSlot from "../models/ParkingSlot.js";
 import Whitelist from "../models/Whitelist.js";
-import Sensor from "../models/Sensor.js";
 import axios from "axios";
 import FormData from "form-data";
 
@@ -112,20 +110,20 @@ export const lprController = async (req, res) => {
 
     req.app.get("io")?.emit("device:control", { action: "Open" }); // Gui len thiet bi de mo cổng
 
-    // Gửi lệnh mở barrier qua MQTT (không phụ thuộc slot)
+    // Gửi lệnh mở barrier qua MQTT
     const mqttClient = req.app.get("mqttClient");
     if (mqttClient) {
       mqttClient.publish(
-        "esp32/parking/gate/control",
-        "open", // ESP32 sẽ tự đóng khi xe qua sensor 2
+        "esp32/parking/gate1/control",
+        "open_then_close",
         { qos: 1 }
       );
       console.log(
-        "[LPR] ✅ Sent MQTT command to open barrier (esp32/parking/gate/control = 'open')"
+        "[LPR] Sent MQTT command to gate1 (esp32/parking/gate1/control = 'open_then_close')"
       );
     } else {
       console.error(
-        "[LPR] ❌ MQTT client not available - cannot send open command"
+        "[LPR] MQTT client not available - cannot send open command"
       );
     }
 

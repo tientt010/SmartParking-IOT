@@ -10,11 +10,13 @@ char pass[] = "66668888";
 // ===== MQTT =====
 const char *mqtt_server = "13.215.71.135";
 const int mqtt_port = 1883;
-const char *mqtt_topic_entry = "esp32/parking/entry";               // sự kiện xe vào
-const char *mqtt_topic_exit = "esp32/parking/exit";                 // sự kiện xe ra
-const char *mqtt_topic_s36 = "esp32/parking/sensor";                // khoảng cách sensor 3..6 (1s/1 lần)
-const char *mqtt_topic_gate_control = "esp32/parking/gate/control"; // điều khiển servo từ server
-const char *mqtt_topic_gate_status = "esp32/parking/gate/status";   // trạng thái servo
+const char *mqtt_topic_entry = "esp32/parking/entry";                  // sự kiện xe vào
+const char *mqtt_topic_exit = "esp32/parking/exit";                    // sự kiện xe ra
+const char *mqtt_topic_s36 = "esp32/parking/sensor";                   // khoảng cách sensor 3..6 (1s/1 lần)
+const char *mqtt_topic_gate1_control = "esp32/parking/gate1/control";  // điều khiển servo1 (cửa vào) từ server
+const char *mqtt_topic_gate2_control = "esp32/parking/gate2/control";  // điều khiển servo2 (cửa ra) từ server
+const char *mqtt_topic_gate_control = "esp32/parking/gate/control";    // điều khiển chung (legacy)
+const char *mqtt_topic_gate_status = "esp32/parking/gate/status";      // trạng thái servo
 const char *mqtt_client_id = "ESP32_Device";
 
 // ===== Ultrasonic pins (6 cảm biến) =====
@@ -26,14 +28,21 @@ const int echoPins[6] = {33, 35, 2, 4, 5, 19};
 // QUy tắc xe vào 1 --> 2
 // Quy tắc xe ra 2 --> 1
 // ===== Servo =====
-// Lưu ý: GPIO34 là input-only, không PWM → dùng GPIO27 để điều khiển servo.
-const int servoPin = 27;
-Servo gateServo;
-bool gateIsOpen = false;    // Trạng thái cổng
-bool autoCloseMode = false; // Chế độ tự động đóng khi xe qua
+// Servo1 (cửa vào) - GPIO27
+// Servo2 (cửa ra) - GPIO26
+const int servo1Pin = 27; // Cửa vào (Entry Gate)
+const int servo2Pin = 26; // Cửa ra (Exit Gate)
+Servo servo1; // Cửa vào
+Servo servo2; // Cửa ra
+bool gate1IsOpen = false; // Trạng thái cửa vào
+bool gate2IsOpen = false; // Trạng thái cửa ra
+bool gate1AutoClose = false; // Chế độ tự động đóng gate1
+bool gate2AutoClose = false; // Chế độ tự động đóng gate2
+unsigned long gate1OpenTime = 0; // Thời điểm mở cửa vào (để tự đóng sau 5s)
+unsigned long gate2OpenTime = 0; // Thời điểm mở cửa ra (để tự đóng sau 5s)
 
 // ===== Logic tham số =====
-const float detectionThreshold = 10.0;              // cm (có xe khi < 10cm)
+const float detectionThreshold = 4.0;              // cm (có xe khi < 4cm)
 const unsigned long rearmMs = 3000;                 // chống lặp sự kiện 3s
 const unsigned long publishIntervalMs = 1000;       // chu kỳ gửi sensor 3..6
 const unsigned long checkEntryExitIntervalMs = 200; // chu kỳ kiểm tra vào/ra
@@ -44,16 +53,6 @@ bool sensor2_prev = false;
 unsigned long lastEntryMs = 0;
 unsigned long lastExitMs = 0;
 unsigned long lastCheckEntryExitMs = 0;
-unsigned long gateOpenedAtMs = 0; // Thời điểm cổng được mở (để tránh đóng ngay)
-
-// Trạng thái để theo dõi xe đi qua
-enum VehicleState
-{
-  IDLE,
-  S1_DETECTED,
-  S2_DETECTED
-};
-VehicleState vehicleState = IDLE;
 
 // Tick gửi định kỳ
 unsigned long lastPublishS36Ms = 0;
@@ -61,6 +60,14 @@ unsigned long lastPublishS36Ms = 0;
 // ===== MQTT client =====
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+// ===== Forward declarations =====
+void openGate1(bool autoClose = false);
+void closeGate1();
+void openGate2(bool autoClose = false);
+void closeGate2();
+void publishEvent(const char *topic, const char *type);
+void publishGateStatus(const char *status);
 
 // ===== Time (GMT+7) =====
 const long gmtOffset_sec = 7 * 3600;
@@ -78,8 +85,10 @@ void setup()
   }
 
   // Servo
-  gateServo.attach(servoPin);
-  gateServo.write(0); // đóng cổng
+  servo1.attach(servo1Pin);
+  servo2.attach(servo2Pin);
+  servo1.write(0); // đóng cửa vào
+  servo2.write(0); // đóng cửa ra
 
   // WiFi
   Serial.print("Ket noi WiFi: ");
@@ -129,7 +138,10 @@ void loop()
     lastCheckEntryExitMs = nowMs;
   }
 
-  // 2) Gửi khoảng cách sensor 3..6 mỗi 1s
+  // 2) Tự động đóng cửa sau 5s
+  autoCloseGates(nowMs);
+
+  // 3) Gửi khoảng cách sensor 3..6 mỗi 1s
   if (nowMs - lastPublishS36Ms >= publishIntervalMs)
   {
     publishS36Distances();
@@ -157,78 +169,60 @@ float readUltrasonic(int idx)
 
 void checkEntryExit()
 {
-  float d1 = readUltrasonic(0); // Sensor 1 - trước servo
-  delay(10);                    // Delay giữa các lần đọc
-  float d2 = readUltrasonic(1); // Sensor 2 - sau servo
+  float d1 = readUltrasonic(0); // Sensor 1 - cửa vào
+  delay(10);                    
+  float d2 = readUltrasonic(1); // Sensor 2 - cửa ra
 
   bool s1 = (d1 > 0 && d1 < detectionThreshold);
   bool s2 = (d2 > 0 && d2 < detectionThreshold);
 
   unsigned long nowMs = millis();
 
-  // ===== LOGIC XE RA: Đơn giản - Sensor2 detect → mở cửa ngay =====
-  if (s2 && !gateIsOpen && (nowMs - lastExitMs > rearmMs))
+  // ===== LOGIC CỬA VÀO: Sensor1 phát hiện → gửi entry → chờ server mở =====
+  if (s1 && !sensor1_prev && (nowMs - lastEntryMs > rearmMs))
   {
-    // Sensor2 phát hiện xe và cổng đang đóng → XE RA → mở cửa ngay
+    // Sensor1 phát hiện xe lần đầu → gửi event "entry"
+    publishEvent(mqtt_topic_entry, "entry");
+    lastEntryMs = nowMs;
+    Serial.print("ENTRY: Sensor 1 detected (d1=");
+    Serial.print(d1);
+    Serial.println("cm) - Entry event sent, waiting for server command");
+  }
+
+  // ===== LOGIC CỬA RA: Sensor2 phát hiện → tự động mở cửa ra ngay =====
+  if (s2 && !sensor2_prev && !gate2IsOpen && (nowMs - lastExitMs > rearmMs))
+  {
+    // Sensor2 phát hiện xe lần đầu → mở cửa ra tự động (KHÔNG tự đóng)
     publishEvent(mqtt_topic_exit, "exit");
-    gateServo.write(90);
-    gateIsOpen = true;
-    autoCloseMode = true; // Bật chế độ tự động đóng khi xe qua sensor 1
-    gateOpenedAtMs = millis(); // Lưu thời điểm mở cửa
-    publishGateStatus("open");
+    openGate2(false); // Mở cửa ra - manual mode (không tự đóng)
     lastExitMs = nowMs;
     Serial.print("EXIT: Sensor 2 detected (d2=");
     Serial.print(d2);
-    Serial.print("cm, s1=");
-    Serial.print(s1 ? "ON" : "OFF");
-    Serial.println(") - Gate AUTO OPENED");
-  }
-
-  // ===== ĐÓNG CỔNG: Xe đã đi qua sensor1 → đóng cửa =====
-  // Chỉ đóng khi:
-  // 1. Cổng đang mở và autoCloseMode = true
-  // 2. Sensor1 từ CÓ detect → KHÔNG detect (xe đã đi qua sensor1)
-  // 3. Cổng đã mở ít nhất 2 giây (đủ thời gian xe đi qua)
-  if (gateIsOpen && autoCloseMode && sensor1_prev && !s1 && 
-      (nowMs - gateOpenedAtMs > 2000))
-  {
-    // Xe đã đi qua sensor1 → đóng cửa
-    Serial.print("EXIT: Closing gate - sensor1 passed (opened ");
-    Serial.print(nowMs - gateOpenedAtMs);
-    Serial.println("ms ago)");
-    delay(500);
-    closeGate();
-    Serial.println("EXIT: Vehicle passed sensor 1 - Gate AUTO CLOSED");
-  }
-
-  // ===== XE VÀO: Sensor 1 phát hiện → publish entry NGAY → chờ server mở =====
-  if (s1 && !s2 && vehicleState == IDLE && (nowMs - lastEntryMs > rearmMs))
-  {
-    publishEvent(mqtt_topic_entry, "entry");
-    vehicleState = S1_DETECTED; // Đánh dấu đã gửi entry, đang chờ server mở barrier
-    lastEntryMs = nowMs;
-    Serial.println("ENTRY: Sensor 1 detected - entry event sent, waiting for server to open gate");
-  }
-
-  // ===== Sau khi barrier mở (từ server), xe qua sensor 2 → tự đóng =====
-  if (vehicleState == S1_DETECTED && gateIsOpen && s2)
-  {
-    // Xe đã vào qua sensor 2, đóng barrier
-    delay(500);
-    closeGate();
-    vehicleState = IDLE;
-    Serial.println("ENTRY: Vehicle passed sensor 2 - gate AUTO CLOSED");
-  }
-
-  // Reset state nếu cả 2 sensor đều không phát hiện xe
-  // Lưu ý: Giữ S1_DETECTED nếu đang chờ xe qua sensor 2 (barrier đã mở)
-  if (!s1 && !s2 && vehicleState != S1_DETECTED)
-  {
-    vehicleState = IDLE;
+    Serial.println("cm) - Exit gate OPENED (manual mode)");
   }
 
   sensor1_prev = s1;
   sensor2_prev = s2;
+}
+
+// Tự động đóng cửa sau 5 giây
+void autoCloseGates(unsigned long nowMs)
+{
+  const unsigned long autoCloseDelay = 5000; // 5 giây
+
+  // Tự động đóng cửa vào sau 5s (chỉ khi bật chế độ auto close)
+  if (gate1IsOpen && gate1AutoClose && (nowMs - gate1OpenTime >= autoCloseDelay))
+  {
+    closeGate1();
+    Serial.println("ENTRY: Gate 1 AUTO CLOSED after 5s");
+  }
+
+  // Tự động đóng cửa ra sau 5s (chỉ khi bật chế độ auto close)
+  if (gate2IsOpen && gate2AutoClose && (nowMs - gate2OpenTime >= autoCloseDelay))
+  {
+    closeGate2();
+    Serial.println("EXIT: Gate 2 AUTO CLOSED after 5s");
+  }
 }
 
 void publishS36Distances()
@@ -255,7 +249,7 @@ void publishS36Distances()
   json += "\"sensor5\":" + valueOrNull(d5) + ",";
   json += "\"sensor6\":" + valueOrNull(d6) + ",";
   json += "\"ts\":" + String((long)time(nullptr)) + ",";
-  json += "\"iso\":\"" + nowISO8601() + "\"";
+  json += "\"iso\"😕"" + nowISO8601() + "\"";
   json += "}";
 
   bool ok = client.publish(mqtt_topic_s36, json.c_str(), true);
@@ -274,57 +268,105 @@ String valueOrNull(float d)
   return String("null");
 }
 
+void openGate1(bool autoClose)
+{
+  if (!gate1IsOpen)
+  {
+    servo1.write(90);
+    gate1IsOpen = true;
+    gate1AutoClose = autoClose;
+    if (autoClose)
+    {
+      gate1OpenTime = millis();
+      Serial.println("Gate 1 (ENTRY) OPENED - will auto close in 5s");
+    }
+    else
+    {
+      Serial.println("Gate 1 (ENTRY) OPENED - manual mode");
+    }
+    publishGateStatus("gate1_open");
+  }
+}
+
+void closeGate1()
+{
+  if (gate1IsOpen)
+  {
+    servo1.write(0);
+    gate1IsOpen = false;
+    gate1AutoClose = false;
+    publishGateStatus("gate1_closed");
+    Serial.println("Gate 1 (ENTRY) CLOSED");
+  }
+}
+
+void openGate2(bool autoClose)
+{
+  if (!gate2IsOpen)
+  {
+    servo2.write(90);
+    gate2IsOpen = true;
+    gate2AutoClose = autoClose;
+    if (autoClose)
+    {
+      gate2OpenTime = millis();
+      Serial.println("Gate 2 (EXIT) OPENED - will auto close in 5s");
+    }
+    else
+    {
+      Serial.println("Gate 2 (EXIT) OPENED - manual mode");
+    }
+    publishGateStatus("gate2_open");
+  }
+}
+
+void closeGate2()
+{
+  if (gate2IsOpen)
+  {
+    servo2.write(0);
+    gate2IsOpen = false;
+    gate2AutoClose = false;
+    publishGateStatus("gate2_closed");
+    Serial.println("Gate 2 (EXIT) CLOSED");
+  }
+}
+
+// Legacy functions - giữ để tương thích với server cũ
 void openGate()
 {
-  if (!gateIsOpen)
-  {
-    gateServo.write(90);
-    gateIsOpen = true;
-    autoCloseMode = false;
-    publishGateStatus("open");
-    Serial.println("Gate OPENED");
-  }
+  openGate1(false); // Mặc định mở cửa vào - manual mode
 }
 
 void closeGate()
 {
-  if (gateIsOpen)
-  {
-    gateServo.write(0);
-    gateIsOpen = false;
-    autoCloseMode = false;
-    publishGateStatus("closed");
-    Serial.println("Gate CLOSED");
-  }
+  closeGate1(); // Mặc định đóng cửa vào
 }
 
 void openThenClose()
 {
-  // Mở cổng và bật chế độ tự động đóng
-  gateServo.write(90);
-  gateIsOpen = true;
-  autoCloseMode = true;
-  publishGateStatus("open");
-  Serial.println("Gate OPENED - will auto close when vehicle passes sensor 2");
+  // Mở cửa vào và sẽ tự động đóng sau 5s
+  openGate1(true);
 }
 
 void toggleGate()
 {
-  if (gateIsOpen)
+  // Toggle cửa vào
+  if (gate1IsOpen)
   {
-    closeGate();
+    closeGate1();
   }
   else
   {
-    openGate();
+    openGate1(false); // Manual mode
   }
 }
 
 void publishGateStatus(const char *status)
 {
-  String payload = String("{\"status\":\"") + status +
+  String payload = String("{\"status\"😕"") + status +
                    "\",\"ts\":" + String((long)time(nullptr)) +
-                   ",\"iso\":\"" + nowISO8601() + "\"}";
+                   ",\"iso\"😕"" + nowISO8601() + "\"}";
   client.publish(mqtt_topic_gate_status, payload.c_str(), true);
   Serial.print("Gate status: ");
   Serial.println(status);
@@ -344,30 +386,61 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
   Serial.print("]: ");
   Serial.println(message);
 
-  // Xử lý lệnh điều khiển cổng
-  if (String(topic) == mqtt_topic_gate_control)
-  {
-    message.toLowerCase();
+  String topicStr = String(topic);
+  message.toLowerCase();
 
+  // Xử lý lệnh điều khiển cửa vào (gate1)
+  if (topicStr == mqtt_topic_gate1_control || topicStr == mqtt_topic_gate_control)
+  {
     if (message == "open")
     {
-      openGate();
+      openGate1(false); // Manual mode - không tự đóng
     }
     else if (message == "close")
     {
-      closeGate();
+      closeGate1();
     }
     else if (message == "open_then_close")
     {
-      openThenClose();
+      openGate1(true); // Sẽ tự đóng sau 5s
     }
     else if (message == "toggle")
     {
-      toggleGate();
+      if (gate1IsOpen)
+        closeGate1();
+      else
+        openGate1(false); // Manual mode
     }
     else
     {
-      Serial.println("Unknown gate command");
+      Serial.println("Unknown gate1 command");
+    }
+  }
+  // Xử lý lệnh điều khiển cửa ra (gate2)
+  else if (topicStr == mqtt_topic_gate2_control)
+  {
+    if (message == "open")
+    {
+      openGate2(false); // Manual mode - không tự đóng
+    }
+    else if (message == "close")
+    {
+      closeGate2();
+    }
+    else if (message == "open_then_close")
+    {
+      openGate2(true); // Sẽ tự đóng sau 5s
+    }
+    else if (message == "toggle")
+    {
+      if (gate2IsOpen)
+        closeGate2();
+      else
+        openGate2(false); // Manual mode
+    }
+    else
+    {
+      Serial.println("Unknown gate2 command");
     }
   }
 }
@@ -381,12 +454,20 @@ void reconnectMQTT()
     {
       Serial.println("OK");
       // Subscribe topic điều khiển cổng
-      client.subscribe(mqtt_topic_gate_control);
-      Serial.print("Subscribed to: ");
+      client.subscribe(mqtt_topic_gate_control);   // Legacy - điều khiển gate1
+      client.subscribe(mqtt_topic_gate1_control);  // Điều khiển riêng gate1
+      client.subscribe(mqtt_topic_gate2_control);  // Điều khiển riêng gate2
+      Serial.println("Subscribed to:");
+      Serial.print("  - ");
       Serial.println(mqtt_topic_gate_control);
+      Serial.print("  - ");
+      Serial.println(mqtt_topic_gate1_control);
+      Serial.print("  - ");
+      Serial.println(mqtt_topic_gate2_control);
 
       // Publish trạng thái ban đầu
-      publishGateStatus(gateIsOpen ? "open" : "closed");
+      publishGateStatus(gate1IsOpen ? "gate1_open" : "gate1_closed");
+      publishGateStatus(gate2IsOpen ? "gate2_open" : "gate2_closed");
     }
     else
     {
@@ -431,9 +512,9 @@ String nowISO8601()
 void publishEvent(const char *topic, const char *type)
 {
   time_t now = time(nullptr);
-  String payload = String("{\"event\":\"") + type +
+  String payload = String("{\"event\"😕"") + type +
                    "\",\"ts\":" + String((long)now) +
-                   ",\"iso\":\"" + nowISO8601() + "\"}";
+                   ",\"iso\"😕"" + nowISO8601() + "\"}";
   client.publish(topic, payload.c_str(), true);
   Serial.print("PUB ");
   Serial.print(topic);

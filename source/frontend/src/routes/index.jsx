@@ -7,6 +7,7 @@ import LogsPage from "@/pages/LogsPage";
 import SlotsPage from "@/pages/SlotsPage";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import GuestRoute from "@/components/auth/GuestRoute";
+import SettingsPage from "../pages/SettingPage";
 
 export const router = createBrowserRouter([
   {
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: "whitelist", element: <WhitelistPage /> },
       { path: "logs", element: <LogsPage /> },
       { path: "slots", element: <SlotsPage /> },
+      { path: "settings", element: <SettingsPage /> },
     ],
   },
   { path: "*", element: <Navigate to="/login" replace /> },

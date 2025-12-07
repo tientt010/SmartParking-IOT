@@ -46,7 +46,7 @@ const startServer = async () => {
     console.log(`Server is running on port ${PORT}`);
   });
 
-  const mqttClient = createMqttClient();
+  const mqttClient = createMqttClient(io);
   app.set("mqttClient", mqttClient);
 };
 

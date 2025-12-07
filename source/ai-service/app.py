@@ -2,7 +2,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+import ssl
 from PIL import Image
+
+# Bypass SSL certificate verification 
+ssl._create_default_https_context = ssl._create_unverified_context
 
 if not hasattr(Image, "ANTIALIAS") and hasattr(Image, "Resampling"):
     Image.ANTIALIAS = Image.Resampling.LANCZOS
@@ -50,7 +54,7 @@ def detect_license_plate():
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
+    port = int(os.getenv("PORT", 5001))
     lpr_model.load_model()
 
     print(f"AI Service running on port {port}")

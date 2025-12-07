@@ -3,17 +3,13 @@ import Log from "../models/Log.js";
 
 export const processExit = async (req, res) => {
   try {
-    // Khi ESP32 gửi exit event, không có slotNumber trong body
-    // Tự động tìm slot đang occupied để giải phóng
     const { slotNumber } = req.body;
 
     let slot;
 
     if (slotNumber) {
-      // Nếu có slotNumber từ frontend (manual exit)
       slot = await ParkingSlot.findOne({ slotNumber });
     } else {
-      // Tự động tìm slot đang occupied đầu tiên (từ ESP32 exit event)
       slot = await ParkingSlot.findOne({ status: "occupied" });
     }
 
@@ -27,7 +23,6 @@ export const processExit = async (req, res) => {
 
     const vehiclePlate = slot.vehiclePlate;
 
-    // Giải phóng slot
     slot.status = "empty";
     slot.vehiclePlate = null;
     slot.entryTime = null;
@@ -36,7 +31,6 @@ export const processExit = async (req, res) => {
 
     console.log(`[Exit] Slot ${slot.slotNumber} freed${vehiclePlate ? ` - Vehicle: ${vehiclePlate}` : ""}`);
 
-    // Log exit event
     if (vehiclePlate) {
       await Log.create({
         vehiclePlate: vehiclePlate,
@@ -47,7 +41,6 @@ export const processExit = async (req, res) => {
       });
     }
 
-    // Emit socket events để frontend update
     req.app.get("io")?.emit("slot:update", {
       slotNumber: slot.slotNumber,
       status: "empty",
@@ -58,8 +51,21 @@ export const processExit = async (req, res) => {
       vehiclePlate: vehiclePlate,
     });
 
-    // Lưu ý: KHÔNG gửi lệnh mở barrier vì ESP32 đã tự động mở rồi
-    // (ESP32 tự mở khi detect s2→s1 pattern)
+    const mqttClient = req.app.get("mqttClient");
+    if (mqttClient) {
+      setTimeout(() => {
+        mqttClient.publish(
+          "esp32/parking/gate2/control",
+          "close",
+          { qos: 1 }
+        );
+        console.log(
+          "[Exit] Sent MQTT command to close gate2 (esp32/parking/gate2/control = 'close') after 5s"
+        );
+      }, 5000);
+    } else {
+      console.warn("[Exit] MQTT client not available - cannot send close command");
+    }
 
     res.json({
       action: "accept",

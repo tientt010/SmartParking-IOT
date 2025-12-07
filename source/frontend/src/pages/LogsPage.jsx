@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { useLogStore } from "@/store/useLogStore";
 import { Search, Filter, Loader2, ArrowUpCircle, ArrowDownCircle, CheckCircle, XCircle } from "lucide-react";
+import { useSocket } from "../hooks/useSocket";
 
 const LogsPage = () => {
   const { logs, isLoading, error, fetchLogs } = useLogStore();
+
+  useSocket({
+    autoRefresh: () => fetchLogs({ limit: filters.limit }),
+  });
 
   const [filters, setFilters] = useState({
     vehiclePlate: "",
