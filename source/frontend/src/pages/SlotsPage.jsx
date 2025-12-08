@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSlotStore } from "@/store/useSlotStore";
 import { useSocket } from "@/hooks/useSocket";
-import { RefreshCw, Filter, Loader2, Car, ParkingSquare } from "lucide-react";
+import { RefreshCw, Filter, Loader2, Car, ParkingSquare, Wrench, Power, PowerOff } from "lucide-react";
 
 const SlotsPage = () => {
-  const { slots, isLoading, error, fetchSlots, getSlotCounts, updateSlot } = useSlotStore();
+  const { slots, isLoading, error, fetchSlots, getSlotCounts, updateSlot, toggleSensorStatus, updateSensorStatus } = useSlotStore();
   const [statusFilter, setStatusFilter] = useState("");
+  const [togglingSlot, setTogglingSlot] = useState(null);
 
   useEffect(() => {
     fetchSlots();
@@ -15,18 +16,31 @@ const SlotsPage = () => {
     onSlotUpdate: (data) => {
       updateSlot(data.slotNumber, data.status);
     },
+    onSensorStatus: (data) => {
+      updateSensorStatus(data.slotNumber, data.isActive);
+    },
     autoRefresh: fetchSlots,
   });
+
+  const handleToggleSensor = async (slotNumber, currentIsActive) => {
+    setTogglingSlot(slotNumber);
+    await toggleSensorStatus(slotNumber, !currentIsActive);
+    setTogglingSlot(null);
+  };
 
   const handleRefresh = () => {
     fetchSlots();
   };
 
   const filteredSlots = statusFilter
-    ? slots.filter((slot) => slot.status === statusFilter)
+    ? slots.filter((slot) => {
+        if (statusFilter === "maintenance") return slot.isMaintenance;
+        if (slot.isMaintenance) return false;
+        return slot.status === statusFilter;
+      })
     : slots;
 
-  const { empty, occupied, total } = getSlotCounts();
+  const { empty, occupied, maintenance, total } = getSlotCounts();
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "-";
@@ -59,7 +73,7 @@ const SlotsPage = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -87,6 +101,15 @@ const SlotsPage = () => {
             <ParkingSquare className="w-10 h-10 text-green-400" />
           </div>
         </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Bảo trì</p>
+              <p className="text-2xl font-bold text-gray-500 mt-1">{maintenance}</p>
+            </div>
+            <Wrench className="w-10 h-10 text-gray-400" />
+          </div>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
@@ -103,6 +126,7 @@ const SlotsPage = () => {
               <option value="">Tất cả</option>
               <option value="empty">Trống</option>
               <option value="occupied">Đã sử dụng</option>
+              <option value="maintenance">Bảo trì</option>
             </select>
           </div>
           <div className="flex flex-col">
@@ -137,7 +161,9 @@ const SlotsPage = () => {
             <div
               key={slot._id}
               className={`bg-white rounded-lg shadow-sm p-4 border-2 transition ${
-                slot.status === "occupied"
+                slot.isMaintenance
+                  ? "border-gray-300 bg-gray-100"
+                  : slot.status === "occupied"
                   ? "border-orange-200 bg-orange-50"
                   : "border-green-200 bg-green-50"
               }`}
@@ -146,7 +172,11 @@ const SlotsPage = () => {
                 <h3 className="text-lg font-bold text-gray-800">
                   {slot.slotNumber}
                 </h3>
-                {slot.status === "occupied" ? (
+                {slot.isMaintenance ? (
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-600">
+                    Bảo trì
+                  </span>
+                ) : slot.status === "occupied" ? (
                   <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-700">
                     Đã sử dụng
                   </span>
@@ -157,7 +187,33 @@ const SlotsPage = () => {
                 )}
               </div>
 
-              {slot.status === "occupied" && (
+              {/* Maintenance info */}
+              {slot.isMaintenance && (
+                <div className="space-y-2 mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-center py-2">
+                    <Wrench className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-xs text-gray-500 text-center">
+                    {slot.maintenanceReason}
+                  </p>
+                  {slot.sensor && (
+                    <button
+                      onClick={() => handleToggleSensor(slot.slotNumber, slot.sensor.isActive)}
+                      disabled={togglingSlot === slot.slotNumber}
+                      className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition cursor-pointer disabled:opacity-50 text-sm"
+                    >
+                      {togglingSlot === slot.slotNumber ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Power className="w-4 h-4" />
+                      )}
+                      Bật sensor
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {slot.status === "occupied" && !slot.isMaintenance && (
                 <div className="space-y-2 mt-4 pt-4 border-t border-gray-200">
                   <div>
                     <p className="text-xs text-gray-500">Biển số xe</p>
@@ -173,14 +229,42 @@ const SlotsPage = () => {
                       </p>
                     </div>
                   )}
+                  {slot.sensor && (
+                    <button
+                      onClick={() => handleToggleSensor(slot.slotNumber, slot.sensor.isActive)}
+                      disabled={togglingSlot === slot.slotNumber}
+                      className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition cursor-pointer disabled:opacity-50 text-sm"
+                    >
+                      {togglingSlot === slot.slotNumber ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <PowerOff className="w-4 h-4" />
+                      )}
+                      Tắt sensor
+                    </button>
+                  )}
                 </div>
               )}
 
-              {slot.status === "empty" && (
+              {slot.status === "empty" && !slot.isMaintenance && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="flex items-center justify-center py-2">
                     <ParkingSquare className="w-8 h-8 text-green-400" />
                   </div>
+                  {slot.sensor && (
+                    <button
+                      onClick={() => handleToggleSensor(slot.slotNumber, slot.sensor.isActive)}
+                      disabled={togglingSlot === slot.slotNumber}
+                      className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition cursor-pointer disabled:opacity-50 text-sm"
+                    >
+                      {togglingSlot === slot.slotNumber ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <PowerOff className="w-4 h-4" />
+                      )}
+                      Tắt sensor
+                    </button>
+                  )}
                 </div>
               )}
             </div>

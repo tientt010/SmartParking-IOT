@@ -21,9 +21,39 @@ export const useSlotStore = create((set, get) => ({
 
   getSlotCounts: () => {
     const { slots } = get();
-    const empty = slots.filter((s) => s.status === "empty").length;
-    const occupied = slots.filter((s) => s.status === "occupied").length;
-    return { empty, occupied, total: slots.length };
+    // Chỉ đếm các slot không bảo trì
+    const activeSlots = slots.filter((s) => !s.isMaintenance);
+    const empty = activeSlots.filter((s) => s.status === "empty").length;
+    const occupied = activeSlots.filter((s) => s.status === "occupied").length;
+    const maintenance = slots.filter((s) => s.isMaintenance).length;
+    return { empty, occupied, maintenance, total: slots.length };
+  },
+
+  // Toggle sensor isActive status
+  toggleSensorStatus: async (slotNumber, isActive) => {
+    try {
+      const response = await AxiosInstance.patch(`/slots/${slotNumber}/sensor`, {
+        isActive,
+      });
+      // Cập nhật local state
+      set((state) => ({
+        slots: state.slots.map((slot) =>
+          slot.slotNumber === slotNumber
+            ? {
+                ...slot,
+                isMaintenance: !isActive,
+                maintenanceReason: isActive ? null : "Đã tắt bởi admin",
+                sensor: slot.sensor ? { ...slot.sensor, isActive } : null,
+              }
+            : slot
+        ),
+      }));
+      return response.data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || "Toggle sensor failed";
+      set({ error: errorMessage });
+      return null;
+    }
   },
 
   // Cập nhật slot từ socket event
@@ -37,6 +67,22 @@ export const useSlotStore = create((set, get) => ({
               vehiclePlate: vehiclePlate !== undefined ? vehiclePlate : slot.vehiclePlate,
               entryTime: entryTime !== undefined ? entryTime : slot.entryTime,
               exitTime: exitTime !== undefined ? exitTime : slot.exitTime,
+            }
+          : slot
+      ),
+    }));
+  },
+
+  // Cập nhật sensor status từ socket event
+  updateSensorStatus: (slotNumber, isActive) => {
+    set((state) => ({
+      slots: state.slots.map((slot) =>
+        slot.slotNumber === slotNumber
+          ? {
+              ...slot,
+              isMaintenance: !isActive,
+              maintenanceReason: isActive ? null : "Đã tắt bởi admin",
+              sensor: slot.sensor ? { ...slot.sensor, isActive } : null,
             }
           : slot
       ),

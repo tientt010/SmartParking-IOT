@@ -6,7 +6,8 @@ const sensorSchema = new mongoose.Schema(
     slotNumber: { type: String, required: true },
     status: { type: Number, default: 0 },
     distance: Number,
-    threshold: {type: Number, default: 7},
+    threshold: { type: Number, default: 7 },
+    isActive: { type: Boolean, default: true }, // Admin có thể tắt sensor thủ công
   },
   { timestamps: true }
 );

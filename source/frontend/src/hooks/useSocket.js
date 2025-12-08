@@ -10,6 +10,7 @@ export const useSocket = (options = {}) => {
     onDeviceControl,  // callback lệnh điều khiển
     onSlotUpdate,     // callback slot update
     onExitProcessed,  // callback exit processed
+    onSensorStatus,   // callback sensor status (bật/tắt)
     autoRefresh,      // function refresh data
   } = options;
 
@@ -80,6 +81,16 @@ export const useSocket = (options = {}) => {
       autoRefresh?.();
     });
 
+    socket.on("sensor:status", (data) => {
+      console.log("Sensor Status:", data);
+      const statusText = data.isActive ? "bật" : "tắt";
+      toast(`Sensor ${data.sensorId} đã ${statusText}`, {
+        duration: 3000,
+        icon: data.isActive ? "🟢" : "🔴",
+      });
+      onSensorStatus?.(data);
+    });
+
     return () => {
       socket.off("connect");
       socket.off("disconnect");
@@ -87,9 +98,10 @@ export const useSocket = (options = {}) => {
       socket.off("device:control");
       socket.off("slot:update");
       socket.off("exit:processed");
+      socket.off("sensor:status");
       socket.disconnect();
     };
-  }, [onLprResult, onDeviceControl, onSlotUpdate, onExitProcessed, autoRefresh]);
+  }, [onLprResult, onDeviceControl, onSlotUpdate, onExitProcessed, onSensorStatus, autoRefresh]);
 
   const emit = useCallback((event, data) => {
     socketRef.current?.emit(event, data);
