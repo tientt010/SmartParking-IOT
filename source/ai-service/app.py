@@ -22,7 +22,6 @@ CORS(app)
 model_name = "easyocr"
 lpr_model = LPRModel(lang=["en"])
 
-
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "ai-service"})
@@ -37,6 +36,7 @@ def detect_license_plate():
         file = request.files["image"]
         image_bytes = file.read()
 
+        # Preprocess image (resize)
         image = preprocess_image(image_bytes)
 
         plate_number = lpr_model.predict(image)

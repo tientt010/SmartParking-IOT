@@ -31,6 +31,7 @@ export const createMqttClient = (io = null) => {
   let lprInProgress = false;
   let isVehicleAtSensor1 = false; // Trạng thái xe có đang ở vùng sensor 1 không
   const SENSOR1_THRESHOLD = 10.0; // cm (giống ESP32: detectionThreshold = 10.0)
+  let gate2CloseTimeout = null; // Timeout để đóng gate2 sau 5s
 
   client.on("message", async (topic, message) => {
     try {
@@ -129,14 +130,10 @@ export const createMqttClient = (io = null) => {
       if (topic === "esp32/parking/gate/status") {
         console.log("[MQTT] Gate status received:", payload);
         
-        // payload format: {"status":"gate1_open","ts":1234567890,"iso":"2024-01-01T12:00:00+0700"}
         const { status, ts, iso } = payload;
         
-        // Cập nhật trạng thái trong memory
         updateGateStatus(status, ts, iso);
         
-        // Parse gate number và state từ status string
-        // status có thể là: "gate1_open", "gate1_closed", "gate2_open", "gate2_closed"
         let gateId = null;
         let gateState = null;
         
@@ -147,10 +144,43 @@ export const createMqttClient = (io = null) => {
           } else if (status.startsWith("gate2_")) {
             gateId = "gate2";
             gateState = status.replace("gate2_", ""); // "open" hoặc "closed"
+            
+            if (gateState === "open") {
+              if (gate2CloseTimeout) {
+                clearTimeout(gate2CloseTimeout);
+                console.log("[MQTT] Cleared previous gate2 close timeout");
+              }
+              
+              console.log("[MQTT] Gate2 opened - scheduling auto-close in 5 seconds...");
+              gate2CloseTimeout = setTimeout(() => {
+                if (client.connected) {
+                  client.publish(
+                    "esp32/parking/gate2/control",
+                    "close",
+                    { qos: 1 },
+                    (err) => {
+                      if (err) {
+                        console.error("[MQTT] Error closing gate2:", err.message);
+                      } else {
+                        console.log("[MQTT] ✓ Auto-closed gate2 after 5 seconds");
+                      }
+                    }
+                  );
+                } else {
+                  console.warn("[MQTT] Cannot auto-close gate2 - MQTT client not connected");
+                }
+                gate2CloseTimeout = null;
+              }, 5000);
+            } else if (gateState === "closed") {
+              if (gate2CloseTimeout) {
+                clearTimeout(gate2CloseTimeout);
+                gate2CloseTimeout = null;
+                console.log("[MQTT] Gate2 closed - cleared auto-close timeout");
+              }
+            }
           }
         }
 
-        // Emit qua socket.io để frontend nhận được
         if (io) {
           io.emit("gate:status", {
             gateId,

@@ -53,15 +53,39 @@ export const processExit = async (req, res) => {
 
     const mqttClient = req.app.get("mqttClient");
     if (mqttClient) {
+      console.log("[Exit] Scheduling gate2 close command in 5 seconds...");
+      console.log("[Exit] MQTT client status:", mqttClient.connected ? "connected" : "disconnected");
+      
       setTimeout(() => {
-        mqttClient.publish(
-          "esp32/parking/gate2/control",
-          "close",
-          { qos: 1 }
-        );
-        console.log(
-          "[Exit] Sent MQTT command to close gate2 (esp32/parking/gate2/control = 'close') after 5s"
-        );
+        const client = req.app.get("mqttClient");
+        if (!client) {
+          console.error("[Exit] MQTT client not available after 5s timeout");
+          return;
+        }
+        
+        if (!client.connected) {
+          console.warn("[Exit] MQTT client not connected - cannot send close command");
+          return;
+        }
+        
+        try {
+          client.publish(
+            "esp32/parking/gate2/control",
+            "close",
+            { qos: 1 },
+            (err) => {
+              if (err) {
+                console.error("[Exit] MQTT publish error:", err.message);
+              } else {
+                console.log(
+                  "[Exit] ✓ Successfully sent MQTT command to close gate2 (esp32/parking/gate2/control = 'close')"
+                );
+              }
+            }
+          );
+        } catch (error) {
+          console.error("[Exit] Error publishing MQTT command:", error.message);
+        }
       }, 5000);
     } else {
       console.warn("[Exit] MQTT client not available - cannot send close command");
