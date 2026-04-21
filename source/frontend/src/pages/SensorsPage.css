@@ -1,0 +1,40 @@
+.sensor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.sensor-card {
+  transition: var(--transition);
+}
+.sensor-card.s-occupied {
+  border-color: rgba(239,68,68,0.3);
+  box-shadow: 0 0 20px rgba(239,68,68,0.08);
+}
+.sensor-card.s-empty {
+  border-color: rgba(16,185,129,0.2);
+}
+
+.sensor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.sensor-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.sensor-slot {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.sensor-threshold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}

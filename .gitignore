@@ -1,0 +1,161 @@
+# ============================================================
+# SmartParking-Pi - .gitignore
+# ============================================================
+
+# ─────────────────────────────────────────
+# ENVIRONMENT & SECRETS
+# ─────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+# Giữ lại .env.example để tham khảo
+!.env.example
+
+# ─────────────────────────────────────────
+# NODE.JS / JAVASCRIPT (backend + frontend)
+# ─────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# ─────────────────────────────────────────
+# FRONTEND (Vite / React)
+# ─────────────────────────────────────────
+source/frontend/dist/
+source/frontend/.vite/
+source/frontend/build/
+
+# ─────────────────────────────────────────
+# PYTHON (ai-service + pi-driver)
+# ─────────────────────────────────────────
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+__pypackages__/
+
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+.eggs/
+MANIFEST
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+.pyright/
+.ruff_cache/
+
+# ─────────────────────────────────────────
+# PRISMA (database)
+# ─────────────────────────────────────────
+# Giữ lại schema.prisma và migrations
+# Bỏ qua SQLite local dev db nếu có
+*.db
+*.sqlite
+*.sqlite3
+
+# ─────────────────────────────────────────
+# PI-DRIVER (Raspberry Pi / Camera)
+# ─────────────────────────────────────────
+# Ảnh test / capture tạm
+source/pi-driver/test_capture.jpg
+source/pi-driver/test_capture.png
+source/pi-driver/*.jpg
+source/pi-driver/*.jpeg
+source/pi-driver/*.png
+source/pi-driver/captures/
+source/pi-driver/snapshots/
+
+# ─────────────────────────────────────────
+# LOGS
+# ─────────────────────────────────────────
+logs/
+*.log
+*.log.*
+log/
+
+# PM2
+.pm2/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ─────────────────────────────────────────
+# MACOS
+# ─────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon?
+
+# ─────────────────────────────────────────
+# EDITORS & IDEs
+# ─────────────────────────────────────────
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+Session.vim
+
+# Emacs
+*#
+.#*
+
+# ─────────────────────────────────────────
+# MISC
+# ─────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+thumbs.db
+Thumbs.db

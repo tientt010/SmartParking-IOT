@@ -1,0 +1,6 @@
+RPi.GPIO>=0.7.1 ; sys_platform == 'linux'
+gpiozero>=2.0.1 ; sys_platform == 'linux'
+paho-mqtt>=2.1.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+pigpio>=1.78 ; sys_platform == 'linux'

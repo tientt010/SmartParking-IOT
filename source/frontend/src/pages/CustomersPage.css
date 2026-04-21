@@ -1,0 +1,97 @@
+.customers-page { display: flex; flex-direction: column; gap: 20px; }
+
+/* Search */
+.cust-search-bar { max-width: 420px; }
+
+/* States */
+.cust-loading { display: flex; justify-content: center; padding: 60px; }
+.cust-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 60px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); color: var(--text-muted); font-size: 15px;
+}
+.cust-empty div:first-child { font-size: 40px; }
+
+/* Table */
+.cust-idx { color: var(--text-muted); font-size: 12px; width: 36px; }
+.cust-avatar-row { display: flex; align-items: center; gap: 10px; }
+.cust-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.cust-name { font-weight: 600; color: var(--text-primary); }
+.cust-phone { color: var(--text-secondary); font-size: 13px; }
+.cust-date { color: var(--text-muted); font-size: 12px; }
+
+.plate-tag {
+  display: inline-flex; align-items: center; padding: 3px 10px;
+  background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 6px; font-size: 12px; font-weight: 700;
+  color: var(--accent-primary); letter-spacing: 0.5px;
+}
+.no-plate { color: var(--text-muted); font-size: 12px; font-style: italic; }
+
+.cust-balance { font-weight: 700; font-size: 14px; color: var(--accent-success); }
+.cust-balance.low { color: var(--accent-danger); }
+
+.cust-actions { display: flex; gap: 6px; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-xl); padding: 28px;
+  width: 100%; max-width: 540px;
+  animation: slideUp 0.2s ease;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-sm { max-width: 380px; }
+@keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.modal-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.modal-close {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  transition: var(--transition);
+}
+.modal-close:hover { background: var(--bg-input); color: var(--text-primary); }
+
+.modal-form { display: flex; flex-direction: column; gap: 14px; }
+.mf-row { display: flex; gap: 14px; }
+.mf-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.mf-field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+
+.modal-err {
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--accent-danger);
+}
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Topup quick buttons */
+.topup-balance-current {
+  background: var(--bg-input); border-radius: 10px; padding: 12px 14px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.topup-balance-current strong { color: var(--accent-success); font-size: 16px; }
+
+.quick-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.quick-btn {
+  padding: 8px 14px; background: var(--bg-input); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text-secondary); font-size: 13px;
+  font-weight: 700; cursor: pointer; transition: var(--transition);
+}
+.quick-btn:hover, .quick-btn.active {
+  border-color: var(--accent-primary); color: var(--text-primary); background: rgba(99,102,241,0.1);
+}
+
+.plate-input { font-family: monospace; font-size: 15px; font-weight: 700; letter-spacing: 1px; }

@@ -1,0 +1,77 @@
+// Prisma SQLite schema for SmartParking-Pi
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+}
+
+model Log {
+  id           Int       @id @default(autoincrement())
+  vehiclePlate String
+  action       String    
+  status       String   
+  imagePath    String?
+  entryTime    DateTime?
+  exitTime     DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model Whitelist {
+  id           Int    @id @default(autoincrement())
+  vehiclePlate String @unique
+  status       String @default("active") // "active" | "inactive"
+  ownerName    String?
+  createdAt    DateTime @default(now())
+}
+
+model Sensor {
+  id         Int    @id @default(autoincrement())
+  sensorId   String @unique
+  slotNumber String
+  status     Int    @default(0)     // 0 = empty, 1 = occupied
+  distance   Float?
+  threshold  Float  @default(7.0)   // cm
+  updatedAt  DateTime @updatedAt
+}
+
+model ParkingSlot {
+  id           Int       @id @default(autoincrement())
+  slotNumber   String    @unique
+  status       String    @default("empty") // "empty" | "occupied"
+  vehiclePlate String?
+  entryTime    DateTime?
+  exitTime     DateTime?
+  updatedAt    DateTime  @updatedAt
+}
+
+model Customer {
+  id           Int           @id @default(autoincrement())
+  phone        String        @unique
+  name         String
+  vehiclePlate String?
+  balance      Float         @default(0)
+  password     String
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  customerId  Int
+  customer    Customer @relation(fields: [customerId], references: [id])
+  type        String   // "topup" | "payment"
+  amount      Float
+  description String?
+  createdAt   DateTime @default(now())
+}
