@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import routes from "./routes/index.js";
-import { createMqttClient } from "./mqtt/client.js";
+
 
 dotenv.config();
 
@@ -56,8 +56,7 @@ const startServer = async () => {
     console.log(`[Server] Dashboard: http://localhost:${PORT}`);
   });
 
-  // const mqttClient = createMqttClient(io);
-  // app.set("mqttClient", mqttClient);
+
 };
 
 startServer();

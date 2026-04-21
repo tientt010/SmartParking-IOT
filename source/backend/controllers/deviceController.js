@@ -6,16 +6,7 @@ const gateStatus = {
   gate2: { status: "closed", lastUpdate: null },
 };
 
-// Pending commands queue (Pi polls this)
 const pendingCommands = [];
-
-export const updateGateStatus = (status, ts, iso) => {
-  if (status.startsWith("gate1_")) {
-    gateStatus.gate1 = { status: status.replace("gate1_", ""), lastUpdate: new Date() };
-  } else if (status.startsWith("gate2_")) {
-    gateStatus.gate2 = { status: status.replace("gate2_", ""), lastUpdate: new Date() };
-  }
-};
 
 // POST /api/device/control — Admin bấm mở/đóng cổng
 export const controlDevice = async (req, res) => {

@@ -6,7 +6,7 @@ const SENSOR_THRESHOLD = 7.0;
 export const updateSensor = async (req, res) => {
   const io = req.app?.get("io");
   try {
-    const { sensor1, sensor2, sensor3, sensor4, sensor5, sensor6 } = req.body;
+    // main.py chỉ gửi sensor3 + sensor4
 
     const slotMapping = [
       { key: "sensor3", sensorId: "sensor3", slotNumber: "slot1" },
